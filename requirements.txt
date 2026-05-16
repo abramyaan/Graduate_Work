@@ -1,0 +1,42 @@
+# FastAPI и веб-сервер
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+ 
+# База данных (psycopg2-binary — готовый бинарник, не требует компилятора)
+sqlalchemy>=2.0.36
+psycopg2-binary>=2.9.10
+alembic==1.13.1
+ 
+# Pydantic v2 (версии с готовыми wheel для Python 3.13)
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+ 
+# ML и обработка текста
+sentence-transformers>=3.0.0
+torch>=2.6.0
+scikit-learn>=1.5.0
+numpy>=1.26.0
+ 
+# Парсинг документов
+PyPDF2==3.0.1
+python-docx==1.1.0
+ 
+# Генерация отчётов
+reportlab==4.0.9
+openpyxl==3.1.2
+ 
+# Линтеры и форматтеры
+black==24.1.1
+ruff==0.1.15
+ 
+# Тестирование
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0
+ 
+# Утилиты
+python-dotenv==1.0.0
+ 

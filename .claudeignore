@@ -1,0 +1,64 @@
+# Модели (большие бинарные файлы — не читать)
+ml/models/
+files/models/
+*.pt
+*.bin
+*.safetensors
+*.onnx
+
+# Виртуальное окружение Python
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Зависимости фронтенда
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# БД дампы и бэкапы
+*.dump
+*.sql.bak
+*.backup
+backups/
+
+# Файлы резюме (бинарные, большие)
+files/resumes/
+files/reports/
+
+# Датасеты (большие файлы — передавать путь, не читать)
+dataset/*.csv
+
+# Секреты и окружение
+.env
+.env.local
+.env.production
+*.env
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker данные
+.docker/
+docker-data/
+
+# Тестовые артефакты
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
