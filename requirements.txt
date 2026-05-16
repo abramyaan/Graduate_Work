@@ -5,9 +5,10 @@ python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
  
-# База данных (psycopg2-binary — готовый бинарник, не требует компилятора)
+# База данных
 sqlalchemy>=2.0.36
-psycopg2-binary>=2.9.10
+asyncpg>=0.31.0  # Асинхронный драйвер для основного API
+pg8000>=1.31.0    # Синхронный драйвер для скриптов
 alembic==1.13.1
  
 # Pydantic v2 (версии с готовыми wheel для Python 3.13)

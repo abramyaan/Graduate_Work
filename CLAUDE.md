@@ -60,7 +60,7 @@ pytest backend/tests/
 
 ## Переменные окружения (.env)
 ```
-DATABASE_URL=postgresql://user:pass@localhost:5432/resume_db
+DATABASE_URL=postgresql+pg8000://user:pass@localhost:5432/resume_db
 MODEL_PATH=ml/models/finetuned_model
 SECRET_KEY=your-secret-key-here
 JWT_ALGORITHM=HS256

@@ -7,8 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Настройки приложения из переменных окружения"""
 
-    # База данных
-    DATABASE_URL: str = "postgresql://user:pass@localhost:5432/resume_db"
+    # База данных (asyncpg для асинхронного SQLAlchemy)
+    DATABASE_URL: str = "postgresql+asyncpg://user@127.0.0.1:5433/resume_db"
 
     # JWT
     SECRET_KEY: str = "your-secret-key-here-change-in-production"
