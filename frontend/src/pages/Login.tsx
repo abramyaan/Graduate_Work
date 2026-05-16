@@ -4,7 +4,7 @@ import { authApi } from '../api/auth';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,9 +15,8 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await authApi.login({ username, password });
+      const response = await authApi.login({ login, password });
       localStorage.setItem('access_token', response.access_token);
-      localStorage.setItem('user_role', response.role);
       navigate('/dashboard');
     } catch (err: any) {
       setError(
@@ -47,16 +46,16 @@ const Login: React.FC = () => {
           )}
           <div className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="login" className="block text-sm font-medium text-gray-700">
                 Логин
               </label>
               <input
-                id="username"
-                name="username"
+                id="login"
+                name="login"
                 type="text"
                 required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Введите логин"
               />

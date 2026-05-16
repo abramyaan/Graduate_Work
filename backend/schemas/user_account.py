@@ -4,14 +4,14 @@ Pydantic схемы для UserAccount (пользователи)
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 import re
 
 
 class UserAccountBase(BaseModel):
     """Базовая схема пользователя"""
     login: str = Field(..., min_length=5, max_length=50, description="Логин")
-    email: EmailStr = Field(..., description="Email")
+    email: str = Field(..., max_length=100, description="Email")
     last_name: str = Field(..., min_length=1, max_length=100, description="Фамилия")
     first_name: str = Field(..., min_length=1, max_length=100, description="Имя")
     patronymic: Optional[str] = Field(None, max_length=100, description="Отчество")
@@ -38,7 +38,7 @@ class UserAccountCreate(UserAccountBase):
 
 class UserAccountUpdate(BaseModel):
     """Схема для обновления пользователя"""
-    email: Optional[EmailStr] = None
+    email: Optional[str] = Field(None, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     patronymic: Optional[str] = Field(None, max_length=100)

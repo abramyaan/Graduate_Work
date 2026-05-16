@@ -3,7 +3,7 @@ Pydantic схемы для Candidate (кандидаты)
 """
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 import re
 
 
@@ -12,7 +12,7 @@ class CandidateBase(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=100, description="Фамилия")
     first_name: str = Field(..., min_length=1, max_length=100, description="Имя")
     patronymic: Optional[str] = Field(None, max_length=100, description="Отчество")
-    email: Optional[EmailStr] = Field(None, description="Email кандидата")
+    email: Optional[str] = Field(None, max_length=255, description="Email кандидата")
     phone: Optional[str] = Field(None, max_length=20, description="Телефон")
 
     @field_validator("phone")
@@ -37,7 +37,7 @@ class CandidateUpdate(BaseModel):
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     patronymic: Optional[str] = Field(None, max_length=100)
-    email: Optional[EmailStr] = None
+    email: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=20)
 
     @field_validator("phone")

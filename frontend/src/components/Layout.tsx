@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/auth';
+import { User } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,7 +9,21 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
-  const userRole = localStorage.getItem('user_role') || '';
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userData = await authApi.getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        // Если не удалось получить пользователя, выходим
+        authApi.logout();
+        navigate('/login');
+      }
+    };
+    fetchUser();
+  }, [navigate]);
 
   const handleLogout = () => {
     authApi.logout();
@@ -32,9 +47,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 Дашборд
               </button>
-              <span className="text-sm text-gray-600">
-                Роль: <span className="font-medium">{userRole}</span>
-              </span>
+              {user && (
+                <span className="text-sm text-gray-600">
+                  {user.last_name} {user.first_name}
+                  {' '}(<span className="font-medium">{user.role_name}</span>)
+                </span>
+              )}
               <button
                 onClick={handleLogout}
                 className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium"

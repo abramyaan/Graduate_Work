@@ -3,14 +3,9 @@ import { LoginRequest, LoginResponse, User } from '../types';
 
 export const authApi = {
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
-    const formData = new FormData();
-    formData.append('username', credentials.username);
-    formData.append('password', credentials.password);
-
-    const response = await apiClient.post<LoginResponse>('/auth/login', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await apiClient.post<LoginResponse>('/auth/login', {
+      login: credentials.login,
+      password: credentials.password,
     });
     return response.data;
   },

@@ -31,10 +31,9 @@ export const useAuth = () => {
     }
   };
 
-  const login = async (username: string, password: string) => {
-    const response = await authApi.login({ username, password });
+  const login = async (login: string, password: string) => {
+    const response = await authApi.login({ login, password });
     localStorage.setItem('access_token', response.access_token);
-    localStorage.setItem('user_role', response.role);
     setIsAuthenticated(true);
     await checkAuth();
     return response;

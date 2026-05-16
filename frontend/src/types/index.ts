@@ -1,24 +1,26 @@
 // Типы для API
 
 export interface LoginRequest {
-  username: string;
+  login: string;
   password: string;
 }
 
 export interface LoginResponse {
   access_token: string;
   token_type: string;
-  user_id: number;
-  role: string;
 }
 
 export interface User {
-  id: number;
-  username: string;
+  user_id: number;
+  login: string;
   email: string;
-  role: 'Admin' | 'Recruiter' | 'Operator';
-  full_name: string;
-  is_active: boolean;
+  last_name: string;
+  first_name: string;
+  patronymic: string | null;
+  registration_date: string;
+  role_id: number;
+  role_name: string;
+  role_shortname: string | null;
 }
 
 export interface Vacancy {

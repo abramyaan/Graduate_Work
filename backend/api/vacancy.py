@@ -4,7 +4,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from backend.db.database import get_db
@@ -20,13 +20,13 @@ router = APIRouter()
 
 
 @router.post("/", response_model=VacancyResponse, status_code=status.HTTP_201_CREATED)
-def create_vacancy(
+async def create_vacancy(
     vacancy_data: VacancyCreate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Создать новую вакансию"""
     # Проверка существования специализации
-    specialization = db.get(Specialization, vacancy_data.specialization_id)
+    specialization = await db.get(Specialization, vacancy_data.specialization_id)
     if not specialization:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -36,18 +36,18 @@ def create_vacancy(
     # Создание вакансии
     vacancy = Vacancy(**vacancy_data.model_dump())
     db.add(vacancy)
-    db.commit()
-    db.refresh(vacancy)
+    await db.commit()
+    await db.refresh(vacancy)
 
     return vacancy
 
 
 @router.get("/", response_model=List[VacancyWithSpecialization])
-def get_vacancies(
+async def get_vacancies(
     skip: int = 0,
     limit: int = 100,
     is_active: bool = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Получить список всех вакансий"""
     query = select(Vacancy).join(Specialization)
@@ -56,25 +56,26 @@ def get_vacancies(
         query = query.where(Vacancy.is_active == is_active)
 
     query = query.offset(skip).limit(limit)
-    vacancies = db.execute(query).scalars().all()
+    result = await db.execute(query)
+    vacancies = result.scalars().all()
 
     # Добавление названия специализации
-    result = []
+    output = []
     for vacancy in vacancies:
         vacancy_dict = VacancyWithSpecialization.model_validate(vacancy).model_dump()
         vacancy_dict["specialization_name"] = vacancy.specialization.name
-        result.append(VacancyWithSpecialization(**vacancy_dict))
+        output.append(VacancyWithSpecialization(**vacancy_dict))
 
-    return result
+    return output
 
 
 @router.get("/{vacancy_id}", response_model=VacancyWithSpecialization)
-def get_vacancy(
+async def get_vacancy(
     vacancy_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Получить вакансию по ID"""
-    vacancy = db.get(Vacancy, vacancy_id)
+    vacancy = await db.get(Vacancy, vacancy_id)
     if not vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -88,13 +89,13 @@ def get_vacancy(
 
 
 @router.put("/{vacancy_id}", response_model=VacancyResponse)
-def update_vacancy(
+async def update_vacancy(
     vacancy_id: int,
     vacancy_data: VacancyUpdate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Обновить вакансию"""
-    vacancy = db.get(Vacancy, vacancy_id)
+    vacancy = await db.get(Vacancy, vacancy_id)
     if not vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -103,7 +104,7 @@ def update_vacancy(
 
     # Проверка специализации если она обновляется
     if vacancy_data.specialization_id is not None:
-        specialization = db.get(Specialization, vacancy_data.specialization_id)
+        specialization = await db.get(Specialization, vacancy_data.specialization_id)
         if not specialization:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -115,19 +116,19 @@ def update_vacancy(
     for field, value in update_data.items():
         setattr(vacancy, field, value)
 
-    db.commit()
-    db.refresh(vacancy)
+    await db.commit()
+    await db.refresh(vacancy)
 
     return vacancy
 
 
 @router.delete("/{vacancy_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_vacancy(
+async def delete_vacancy(
     vacancy_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Удалить вакансию (soft delete - устанавливает is_active = False)"""
-    vacancy = db.get(Vacancy, vacancy_id)
+    vacancy = await db.get(Vacancy, vacancy_id)
     if not vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -136,6 +137,6 @@ def delete_vacancy(
 
     # Soft delete
     vacancy.is_active = False
-    db.commit()
+    await db.commit()
 
     return None
