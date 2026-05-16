@@ -2,9 +2,9 @@
 Pydantic схемы для Vacancy (вакансии)
 """
 from datetime import date
-from typing import Optional
+from typing import Optional, Any
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 class VacancyBase(BaseModel):
@@ -39,5 +39,23 @@ class VacancyResponse(VacancyBase):
 class VacancyWithSpecialization(VacancyResponse):
     """Расширенная схема вакансии с данными специализации"""
     specialization_name: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def extract_specialization_name(cls, data: Any) -> Any:
+        """Автоматически извлекает название специализации из загруженного relationship"""
+        if isinstance(data, dict):
+            return data
+
+        # Если это ORM объект с relationship specialization
+        if hasattr(data, 'specialization') and data.specialization:
+            # Создаем словарь с данными, включая specialization_name
+            if not hasattr(data, 'specialization_name'):
+                # Используем __dict__ для избежания дополнительного SQL запроса
+                result = {key: getattr(data, key) for key in cls.model_fields.keys() if hasattr(data, key)}
+                result['specialization_name'] = data.specialization.name
+                return result
+
+        return data
 
     model_config = ConfigDict(from_attributes=True)

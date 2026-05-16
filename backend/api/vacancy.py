@@ -6,6 +6,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from backend.db.database import get_db
 from backend.models.models import Vacancy, Specialization
@@ -50,7 +51,7 @@ async def get_vacancies(
     db: AsyncSession = Depends(get_db)
 ):
     """Получить список всех вакансий"""
-    query = select(Vacancy).join(Specialization)
+    query = select(Vacancy).options(selectinload(Vacancy.specialization))
 
     if is_active is not None:
         query = query.where(Vacancy.is_active == is_active)
@@ -59,14 +60,8 @@ async def get_vacancies(
     result = await db.execute(query)
     vacancies = result.scalars().all()
 
-    # Добавление названия специализации
-    output = []
-    for vacancy in vacancies:
-        vacancy_dict = VacancyWithSpecialization.model_validate(vacancy).model_dump()
-        vacancy_dict["specialization_name"] = vacancy.specialization.name
-        output.append(VacancyWithSpecialization(**vacancy_dict))
-
-    return output
+    # Pydantic автоматически извлечет specialization_name из relationship
+    return [VacancyWithSpecialization.model_validate(vacancy) for vacancy in vacancies]
 
 
 @router.get("/{vacancy_id}", response_model=VacancyWithSpecialization)
@@ -75,17 +70,18 @@ async def get_vacancy(
     db: AsyncSession = Depends(get_db)
 ):
     """Получить вакансию по ID"""
-    vacancy = await db.get(Vacancy, vacancy_id)
+    query = select(Vacancy).where(Vacancy.vacancy_id == vacancy_id).options(selectinload(Vacancy.specialization))
+    result = await db.execute(query)
+    vacancy = result.scalar_one_or_none()
+
     if not vacancy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Вакансия с ID {vacancy_id} не найдена"
         )
 
-    vacancy_dict = VacancyWithSpecialization.model_validate(vacancy).model_dump()
-    vacancy_dict["specialization_name"] = vacancy.specialization.name
-
-    return VacancyWithSpecialization(**vacancy_dict)
+    # Pydantic автоматически извлечет specialization_name из relationship
+    return VacancyWithSpecialization.model_validate(vacancy)
 
 
 @router.put("/{vacancy_id}", response_model=VacancyResponse)
