@@ -23,24 +23,43 @@ export interface User {
   role_shortname: string | null;
 }
 
+export interface Specialization {
+  specialization_id: number;
+  name: string;
+}
+
 export interface Vacancy {
-  id: number;
+  vacancy_id: number;
   title: string;
   description: string;
-  required_skills: string[];
-  experience_years: number;
+  specialization_id: number;
+  specialization_name?: string;
+  is_active: boolean;
   created_at: string;
-  status: 'active' | 'closed' | 'draft';
-  department?: string;
+}
+
+export interface VacancyCreate {
+  title: string;
+  description: string;
+  specialization_id: number;
+  is_active?: boolean;
 }
 
 export interface Candidate {
-  id: number;
-  full_name: string;
-  email: string;
-  phone: string;
-  resume_file_path: string;
-  uploaded_at: string;
+  candidate_id: number;
+  last_name: string;
+  first_name: string;
+  patronymic?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
+export interface CandidateCreate {
+  last_name: string;
+  first_name: string;
+  patronymic?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface EvaluationResult {

@@ -4,7 +4,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from backend.db.database import get_db
@@ -20,16 +20,17 @@ router = APIRouter()
 
 
 @router.post("/", response_model=CandidateResponse, status_code=status.HTTP_201_CREATED)
-def create_candidate(
+async def create_candidate(
     candidate_data: CandidateCreate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Создать нового кандидата"""
     # Проверка на дубликат email если он указан
     if candidate_data.email:
-        existing = db.execute(
+        result = await db.execute(
             select(Candidate).where(Candidate.email == candidate_data.email)
-        ).scalar_one_or_none()
+        )
+        existing = result.scalar_one_or_none()
 
         if existing:
             raise HTTPException(
@@ -40,17 +41,17 @@ def create_candidate(
     # Создание кандидата
     candidate = Candidate(**candidate_data.model_dump())
     db.add(candidate)
-    db.commit()
-    db.refresh(candidate)
+    await db.commit()
+    await db.refresh(candidate)
 
     return candidate
 
 
 @router.get("/", response_model=List[CandidateWithResumes])
-def get_candidates(
+async def get_candidates(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Получить список всех кандидатов"""
     # Запрос с подсчётом резюме для каждого кандидата
@@ -62,7 +63,8 @@ def get_candidates(
         .limit(limit)
     )
 
-    results = db.execute(query).all()
+    result = await db.execute(query)
+    results = result.all()
 
     # Формирование ответа
     candidates = []
@@ -75,12 +77,12 @@ def get_candidates(
 
 
 @router.get("/{candidate_id}", response_model=CandidateWithResumes)
-def get_candidate(
+async def get_candidate(
     candidate_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Получить кандидата по ID"""
-    candidate = db.get(Candidate, candidate_id)
+    candidate = await db.get(Candidate, candidate_id)
     if not candidate:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -88,9 +90,10 @@ def get_candidate(
         )
 
     # Подсчёт резюме
-    resume_count = db.execute(
+    result = await db.execute(
         select(func.count(Resume.resume_id)).where(Resume.candidate_id == candidate_id)
-    ).scalar()
+    )
+    resume_count = result.scalar()
 
     candidate_dict = CandidateWithResumes.model_validate(candidate).model_dump()
     candidate_dict["resume_count"] = resume_count
@@ -99,13 +102,13 @@ def get_candidate(
 
 
 @router.put("/{candidate_id}", response_model=CandidateResponse)
-def update_candidate(
+async def update_candidate(
     candidate_id: int,
     candidate_data: CandidateUpdate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Обновить кандидата"""
-    candidate = db.get(Candidate, candidate_id)
+    candidate = await db.get(Candidate, candidate_id)
     if not candidate:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -114,9 +117,10 @@ def update_candidate(
 
     # Проверка на дубликат email если он обновляется
     if candidate_data.email and candidate_data.email != candidate.email:
-        existing = db.execute(
+        result = await db.execute(
             select(Candidate).where(Candidate.email == candidate_data.email)
-        ).scalar_one_or_none()
+        )
+        existing = result.scalar_one_or_none()
 
         if existing:
             raise HTTPException(
@@ -129,19 +133,19 @@ def update_candidate(
     for field, value in update_data.items():
         setattr(candidate, field, value)
 
-    db.commit()
-    db.refresh(candidate)
+    await db.commit()
+    await db.refresh(candidate)
 
     return candidate
 
 
 @router.delete("/{candidate_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_candidate(
+async def delete_candidate(
     candidate_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Удалить кандидата"""
-    candidate = db.get(Candidate, candidate_id)
+    candidate = await db.get(Candidate, candidate_id)
     if not candidate:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -149,9 +153,10 @@ def delete_candidate(
         )
 
     # Проверка на наличие резюме
-    resume_count = db.execute(
+    result = await db.execute(
         select(func.count(Resume.resume_id)).where(Resume.candidate_id == candidate_id)
-    ).scalar()
+    )
+    resume_count = result.scalar()
 
     if resume_count > 0:
         raise HTTPException(
@@ -160,6 +165,6 @@ def delete_candidate(
         )
 
     db.delete(candidate)
-    db.commit()
+    await db.commit()
 
     return None

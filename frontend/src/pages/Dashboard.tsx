@@ -56,7 +56,15 @@ const Dashboard: React.FC = () => {
   return (
     <Layout>
       <div className="px-4 sm:px-0">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Дашборд</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">Дашборд</h1>
+          <button
+            onClick={() => navigate('/vacancies/create')}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium"
+          >
+            + Создать вакансию
+          </button>
+        </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -77,7 +85,7 @@ const Dashboard: React.FC = () => {
             <div className="divide-y divide-gray-200">
               {vacancies.map((vacancy) => (
                 <div
-                  key={vacancy.id}
+                  key={vacancy.vacancy_id}
                   className="px-6 py-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex justify-between items-start">
@@ -85,39 +93,36 @@ const Dashboard: React.FC = () => {
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">
                         {vacancy.title}
                       </h3>
-                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                      <p className="text-gray-600 text-sm mb-3 line-clamp-3">
                         {vacancy.description}
                       </p>
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {vacancy.required_skills.slice(0, 5).map((skill, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                          >
-                            {skill}
+                      {vacancy.specialization_name && (
+                        <div className="mb-3">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            {vacancy.specialization_name}
                           </span>
-                        ))}
-                        {vacancy.required_skills.length > 5 && (
-                          <span className="text-xs text-gray-500">
-                            +{vacancy.required_skills.length - 5} еще
-                          </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <div className="text-sm text-gray-500">
-                        Опыт: {vacancy.experience_years} {vacancy.experience_years === 1 ? 'год' : 'лет'}
-                        {vacancy.department && ` • ${vacancy.department}`}
+                        Создана: {new Date(vacancy.created_at).toLocaleDateString('ru-RU')}
                       </div>
                     </div>
                     <div className="ml-4 flex flex-col space-y-2">
                       <button
-                        onClick={() => handleRunEvaluation(vacancy.id)}
-                        disabled={runningEvaluation === vacancy.id}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        onClick={() => navigate(`/resumes/upload/${vacancy.vacancy_id}`)}
+                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
                       >
-                        {runningEvaluation === vacancy.id ? 'Оценка...' : 'Запустить оценку'}
+                        Загрузить резюме
                       </button>
                       <button
-                        onClick={() => handleViewResults(vacancy.id)}
+                        onClick={() => handleRunEvaluation(vacancy.vacancy_id)}
+                        disabled={runningEvaluation === vacancy.vacancy_id}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {runningEvaluation === vacancy.vacancy_id ? 'Оценка...' : 'Запустить оценку'}
+                      </button>
+                      <button
+                        onClick={() => handleViewResults(vacancy.vacancy_id)}
                         className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
                       >
                         Результаты

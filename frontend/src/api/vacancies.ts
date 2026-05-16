@@ -1,5 +1,5 @@
 import apiClient from './client';
-import { Vacancy } from '../types';
+import { Vacancy, VacancyCreate } from '../types';
 
 export const vacanciesApi = {
   getAll: async (): Promise<Vacancy[]> => {
@@ -13,7 +13,12 @@ export const vacanciesApi = {
   },
 
   getActive: async (): Promise<Vacancy[]> => {
-    const response = await apiClient.get<Vacancy[]>('/vacancies?status=active');
+    const response = await apiClient.get<Vacancy[]>('/vacancies?is_active=true');
+    return response.data;
+  },
+
+  create: async (data: VacancyCreate): Promise<Vacancy> => {
+    const response = await apiClient.post<Vacancy>('/vacancies', data);
     return response.data;
   },
 };

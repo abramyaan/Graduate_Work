@@ -3,8 +3,8 @@
 """
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import os
 from datetime import datetime
@@ -26,13 +26,19 @@ router = APIRouter()
 @router.post("/upload", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume(
     file: UploadFile = File(...),
-    candidate_id: int = None,
-    db: Session = Depends(get_db)
+    candidate_id: int = Form(...),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Загрузить файл резюме (PDF или DOCX)
     """
     # Проверка формата файла
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Имя файла не указано"
+        )
+
     file_extension = file.filename.split(".")[-1].lower()
     if file_extension not in ["pdf", "docx"]:
         raise HTTPException(
@@ -41,17 +47,11 @@ async def upload_resume(
         )
 
     # Проверка существования кандидата
-    if candidate_id:
-        candidate = db.get(Candidate, candidate_id)
-        if not candidate:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Кандидат с ID {candidate_id} не найден"
-            )
-    else:
+    candidate = await db.get(Candidate, candidate_id)
+    if not candidate:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Необходимо указать candidate_id"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Кандидат с ID {candidate_id} не найден"
         )
 
     # Генерация уникального имени файла
@@ -73,8 +73,8 @@ async def upload_resume(
         extracted_text=None  # TODO: добавить парсинг PDF/DOCX
     )
     db.add(resume)
-    db.commit()
-    db.refresh(resume)
+    await db.commit()
+    await db.refresh(resume)
 
     return ResumeUploadResponse(
         resume_id=resume.resume_id,
@@ -85,13 +85,13 @@ async def upload_resume(
 
 
 @router.post("/", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)
-def create_resume(
+async def create_resume(
     resume_data: ResumeCreate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Создать резюме (без загрузки файла - для тестирования)"""
     # Проверка существования кандидата
-    candidate = db.get(Candidate, resume_data.candidate_id)
+    candidate = await db.get(Candidate, resume_data.candidate_id)
     if not candidate:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -109,18 +109,18 @@ def create_resume(
         extracted_text=resume_data.extracted_text
     )
     db.add(resume)
-    db.commit()
-    db.refresh(resume)
+    await db.commit()
+    await db.refresh(resume)
 
     return resume
 
 
 @router.get("/", response_model=List[ResumeWithCandidate])
-def get_resumes(
+async def get_resumes(
     skip: int = 0,
     limit: int = 100,
     candidate_id: int = None,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Получить список всех резюме"""
     query = select(Resume).join(Candidate)
@@ -129,7 +129,8 @@ def get_resumes(
         query = query.where(Resume.candidate_id == candidate_id)
 
     query = query.offset(skip).limit(limit)
-    resumes = db.execute(query).scalars().all()
+    result_query = await db.execute(query)
+    resumes = result_query.scalars().all()
 
     # Добавление данных кандидата
     result = []
@@ -144,12 +145,12 @@ def get_resumes(
 
 
 @router.get("/{resume_id}", response_model=ResumeWithCandidate)
-def get_resume(
+async def get_resume(
     resume_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Получить резюме по ID"""
-    resume = db.get(Resume, resume_id)
+    resume = await db.get(Resume, resume_id)
     if not resume:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -165,13 +166,13 @@ def get_resume(
 
 
 @router.put("/{resume_id}", response_model=ResumeResponse)
-def update_resume(
+async def update_resume(
     resume_id: int,
     resume_data: ResumeUpdate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Обновить резюме (только extracted_text)"""
-    resume = db.get(Resume, resume_id)
+    resume = await db.get(Resume, resume_id)
     if not resume:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -183,19 +184,19 @@ def update_resume(
     for field, value in update_data.items():
         setattr(resume, field, value)
 
-    db.commit()
-    db.refresh(resume)
+    await db.commit()
+    await db.refresh(resume)
 
     return resume
 
 
 @router.delete("/{resume_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_resume(
+async def delete_resume(
     resume_id: int,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Удалить резюме"""
-    resume = db.get(Resume, resume_id)
+    resume = await db.get(Resume, resume_id)
     if not resume:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -211,6 +212,6 @@ def delete_resume(
             print(f"Ошибка при удалении файла {resume.file_path}: {e}")
 
     db.delete(resume)
-    db.commit()
+    await db.commit()
 
     return None

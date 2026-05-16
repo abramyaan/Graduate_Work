@@ -37,7 +37,7 @@ async def health_check():
 
 
 # Подключение роутеров
-from backend.api import auth, vacancy, candidate, resume, result_evaluation
+from backend.api import auth, vacancy, candidate, resume, result_evaluation, specialization
 
 app.include_router(
     auth.router,
@@ -67,4 +67,10 @@ app.include_router(
     result_evaluation.router,
     prefix="/api/results",
     tags=["Результаты оценки"]
+)
+
+app.include_router(
+    specialization.router,
+    prefix="/api/specializations",
+    tags=["Специализации"]
 )
