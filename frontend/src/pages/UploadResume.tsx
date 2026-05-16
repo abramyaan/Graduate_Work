@@ -82,13 +82,13 @@ const UploadResume: React.FC = () => {
       });
 
       // Загружаем резюме
-      await resumesApi.upload(file, candidate.candidate_id);
+      await resumesApi.upload(file, candidate.candidate_id, Number(selectedVacancyId));
 
       // Перенаправляем на дашборд
       alert('Резюме успешно загружено!');
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка загрузки резюме');
+      setError(err.response?.data?.detail || JSON.stringify(err.response?.data) || 'Ошибка загрузки резюме');
     } finally {
       setLoading(false);
     }

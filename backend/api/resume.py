@@ -2,15 +2,17 @@
 Роутер для работы с резюме
 """
 from typing import List
+import traceback
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import os
 from datetime import datetime
 
 from backend.db.database import get_db
-from backend.models.models import Resume, Candidate
+from backend.models.models import Resume, Candidate, Vacancy, ResumeVacancy
 from backend.schemas.resume import (
     ResumeCreate,
     ResumeUpdate,
@@ -25,63 +27,103 @@ router = APIRouter()
 
 @router.post("/upload", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume(
-    file: UploadFile = File(...),
     candidate_id: int = Form(...),
+    vacancy_id: int = Form(...),
+    file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Загрузить файл резюме (PDF или DOCX)
+    Параметры передаются через multipart/form-data:
+    - candidate_id: ID кандидата
+    - vacancy_id: ID вакансии
+    - file: Файл резюме (PDF или DOCX)
     """
-    # Проверка формата файла
-    if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Имя файла не указано"
+    try:
+        # Проверка формата файла
+        if not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Имя файла не указано"
+            )
+
+        file_extension = file.filename.split(".")[-1].lower()
+        if file_extension not in ["pdf", "docx"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Разрешены только файлы PDF и DOCX"
+            )
+
+        # Проверка существования кандидата
+        candidate = await db.get(Candidate, candidate_id)
+        if not candidate:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Кандидат с ID {candidate_id} не найден"
+            )
+
+        # Проверка существования вакансии
+        vacancy = await db.get(Vacancy, vacancy_id)
+        if not vacancy:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Вакансия с ID {vacancy_id} не найдена"
+            )
+
+        # Генерация уникального имени файла
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_filename = f"resume_{candidate_id}_{timestamp}.{file_extension}"
+        file_path = os.path.join(settings.FILES_RESUMES_PATH, safe_filename)
+
+        # Сохранение файла
+        os.makedirs(settings.FILES_RESUMES_PATH, exist_ok=True)
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+
+        # Создание записи Resume в БД
+        resume = Resume(
+            file_path=file_path,
+            file_format=file_extension,
+            candidate_id=candidate_id,
+            extracted_text=None  # TODO: добавить парсинг PDF/DOCX
         )
+        db.add(resume)
+        await db.commit()
+        await db.refresh(resume)
 
-    file_extension = file.filename.split(".")[-1].lower()
-    if file_extension not in ["pdf", "docx"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Разрешены только файлы PDF и DOCX"
+        # Создание связи резюме с вакансией в ResumeVacancy
+        resume_vacancy = ResumeVacancy(
+            resume_id=resume.resume_id,
+            vacancy_id=vacancy_id
         )
+        db.add(resume_vacancy)
+        await db.commit()
 
-    # Проверка существования кандидата
-    candidate = await db.get(Candidate, candidate_id)
-    if not candidate:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Кандидат с ID {candidate_id} не найден"
+        return ResumeUploadResponse(
+            resume_id=resume.resume_id,
+            file_path=resume.file_path,
+            file_format=resume.file_format,
+            message="Резюме успешно загружено"
         )
-
-    # Генерация уникального имени файла
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_filename = f"resume_{candidate_id}_{timestamp}.{file_extension}"
-    file_path = os.path.join(settings.FILES_RESUMES_PATH, safe_filename)
-
-    # Сохранение файла
-    os.makedirs(settings.FILES_RESUMES_PATH, exist_ok=True)
-    with open(file_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-
-    # Создание записи в БД
-    resume = Resume(
-        file_path=file_path,
-        file_format=file_extension,
-        candidate_id=candidate_id,
-        extracted_text=None  # TODO: добавить парсинг PDF/DOCX
-    )
-    db.add(resume)
-    await db.commit()
-    await db.refresh(resume)
-
-    return ResumeUploadResponse(
-        resume_id=resume.resume_id,
-        file_path=resume.file_path,
-        file_format=resume.file_format,
-        message="Резюме успешно загружено"
-    )
+    except Exception as e:
+        # Детальное логирование ошибки
+        error_detail = {
+            "error": str(e),
+            "type": type(e).__name__,
+            "traceback": traceback.format_exc(),
+            "received_params": {
+                "candidate_id": candidate_id if 'candidate_id' in locals() else "NOT_RECEIVED",
+                "vacancy_id": vacancy_id if 'vacancy_id' in locals() else "NOT_RECEIVED",
+                "file": file.filename if 'file' in locals() and file else "NOT_RECEIVED"
+            }
+        }
+        print("=== ERROR IN upload_resume ===")
+        print(error_detail)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_detail
+        )
 
 
 @router.post("/", response_model=ResumeResponse, status_code=status.HTTP_201_CREATED)

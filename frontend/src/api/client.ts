@@ -4,9 +4,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // Не устанавливаем Content-Type по умолчанию - Axios сам установит нужный
+  // (application/json для JSON, multipart/form-data с boundary для FormData)
 });
 
 // Interceptor для добавления токена к запросам
