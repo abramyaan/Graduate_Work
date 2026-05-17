@@ -13,7 +13,7 @@ const EditVacancy: React.FC = () => {
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
 
-  const [vacancy, setVacancy] = useState<Vacancy | null>(null);
+  const [, setVacancy] = useState<Vacancy | null>(null);
   const [specializations, setSpecializations] = useState<Specialization[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

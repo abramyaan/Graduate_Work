@@ -565,6 +565,50 @@ async def delete_evaluation(
     return None
 
 
+class UpdateRecommendationRequest(BaseModel):
+    """Запрос на обновление рекомендации"""
+    recommendation_text: str = Field(..., description="Текст рекомендации")
+
+
+@router.patch("/{result_id}/recommendation", response_model=ResultEvaluationResponse)
+async def update_recommendation(
+    result_id: int,
+    request: UpdateRecommendationRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Обновить рекомендацию для результата оценки вручную
+    """
+    # Получить результат
+    result = await db.get(ResultEvaluation, result_id)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Результат оценки с ID {result_id} не найден"
+        )
+
+    # Найти рекомендацию по тексту
+    recommendation_query = await db.execute(
+        select(RecommendationRule).where(
+            RecommendationRule.recommendation_text == request.recommendation_text
+        )
+    )
+    recommendation = recommendation_query.scalar_one_or_none()
+
+    if not recommendation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Рекомендация '{request.recommendation_text}' не найдена"
+        )
+
+    # Обновить рекомендацию
+    result.recommendation_id = recommendation.recommendation_id
+    await db.commit()
+    await db.refresh(result)
+
+    return result
+
+
 @router.get("/export/{vacancy_id}")
 async def export_results(
     vacancy_id: int,
@@ -617,6 +661,7 @@ async def export_to_excel(results: List[ResultEvaluation], vacancy_title: str):
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.utils import get_column_letter
     except ImportError:
         # Если openpyxl не установлен, возвращаем CSV
         return await export_to_csv(results, vacancy_title)
@@ -682,15 +727,18 @@ async def export_to_excel(results: List[ResultEvaluation], vacancy_title: str):
             score_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
 
     # Автоматическая ширина столбцов
-    for column in ws.columns:
+    for col_idx in range(1, ws.max_column + 1):
         max_length = 0
-        column_letter = column[0].column_letter
-        for cell in column:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
+        column_letter = get_column_letter(col_idx)
+
+        for row in ws.iter_rows(min_col=col_idx, max_col=col_idx):
+            for cell in row:
+                try:
+                    if cell.value and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+
         adjusted_width = min(max_length + 2, 50)
         ws.column_dimensions[column_letter].width = adjusted_width
 
@@ -859,14 +907,19 @@ async def export_to_pdf(results: List[ResultEvaluation], vacancy_title: str):
     elements.append(table)
 
     # Генерация PDF
-    doc.build(elements)
-    output.seek(0)
+    try:
+        doc.build(elements)
+        output.seek(0)
 
-    headers = {
-        'Content-Disposition': f'attachment; filename="results_{vacancy_title[:30]}.pdf"'
-    }
-    return StreamingResponse(
-        output,
-        media_type="application/pdf",
-        headers=headers
-    )
+        headers = {
+            'Content-Disposition': f'attachment; filename="results_{vacancy_title[:30]}.pdf"'
+        }
+        return StreamingResponse(
+            output,
+            media_type="application/pdf",
+            headers=headers
+        )
+    except Exception as e:
+        # Если ошибка при генерации PDF (например, с кириллицей), возвращаем Excel
+        print(f"Ошибка генерации PDF: {e}")
+        return await export_to_excel(results, vacancy_title)

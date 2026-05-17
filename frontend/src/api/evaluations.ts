@@ -65,4 +65,13 @@ export const evaluationsApi = {
     );
     return response.data;
   },
+
+  updateRecommendation: async (
+    resultId: number,
+    recommendationText: string
+  ): Promise<void> => {
+    await apiClient.patch(`/results/${resultId}/recommendation`, {
+      recommendation_text: recommendationText,
+    });
+  },
 };

@@ -2,18 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useToast } from '../context/ToastContext';
 import { candidatesApi } from '../api/candidates';
-import { Candidate } from '../types';
+import { resumesApi } from '../api/resumes';
+import { Candidate, Resume } from '../types';
 
 const EditCandidate: React.FC = () => {
   const { candidateId } = useParams<{ candidateId: string }>();
   const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
 
-  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [, setCandidate] = useState<Candidate | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [loadingResumes, setLoadingResumes] = useState(false);
+  const [showDeleteResumeDialog, setShowDeleteResumeDialog] = useState(false);
+  const [resumeToDelete, setResumeToDelete] = useState<{ id: number; name: string } | null>(null);
 
   const [formData, setFormData] = useState({
     last_name: '',
@@ -45,11 +51,24 @@ const EditCandidate: React.FC = () => {
         email: data.email || '',
         phone: data.phone || '',
       });
+      loadResumes(Number(candidateId));
     } catch (err: any) {
       showError('Ошибка загрузки данных: ' + (err.response?.data?.detail || err.message));
       navigate('/candidates');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadResumes = async (candidateId: number) => {
+    setLoadingResumes(true);
+    try {
+      const data = await resumesApi.getByCandidate(candidateId);
+      setResumes(data);
+    } catch (err: any) {
+      showError('Ошибка загрузки резюме: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setLoadingResumes(false);
     }
   };
 
@@ -112,6 +131,26 @@ const EditCandidate: React.FC = () => {
       showError('Ошибка обновления: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const confirmDeleteResume = (resumeId: number, fileName: string) => {
+    setResumeToDelete({ id: resumeId, name: fileName });
+    setShowDeleteResumeDialog(true);
+  };
+
+  const handleDeleteResume = async () => {
+    if (!resumeToDelete) return;
+
+    try {
+      await resumesApi.delete(resumeToDelete.id);
+      setResumes(resumes.filter(r => r.resume_id !== resumeToDelete.id));
+      showSuccess(`Резюме "${resumeToDelete.name}" успешно удалено`);
+    } catch (err: any) {
+      showError('Ошибка удаления резюме: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setShowDeleteResumeDialog(false);
+      setResumeToDelete(null);
     }
   };
 
@@ -242,6 +281,65 @@ const EditCandidate: React.FC = () => {
             </button>
           </div>
         </form>
+
+        {/* Список резюме кандидата */}
+        <div className="bg-white shadow-md rounded-lg p-6 mt-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Резюме кандидата</h2>
+          {loadingResumes ? (
+            <div className="text-center py-4 text-gray-500">Загрузка резюме...</div>
+          ) : resumes.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">
+              У данного кандидата нет загруженных резюме
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {resumes.map((resume) => (
+                <div
+                  key={resume.resume_id}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">
+                        {resume.file_format === 'pdf' ? '📄' : '📝'}
+                      </span>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {resume.file_path.split('/').pop()}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Формат: {resume.file_format.toUpperCase()} • Загружено:{' '}
+                          {new Date(resume.upload_date).toLocaleDateString('ru-RU')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => confirmDeleteResume(resume.resume_id, resume.file_path.split('/').pop() || 'резюме')}
+                    className="ml-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium text-sm"
+                  >
+                    Удалить
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Диалог подтверждения удаления резюме */}
+        <ConfirmDialog
+          isOpen={showDeleteResumeDialog}
+          title="Удалить резюме?"
+          message={`Вы уверены, что хотите удалить резюме "${resumeToDelete?.name}"? Это действие нельзя отменить. Все связанные оценки также будут удалены.`}
+          confirmText="Да, удалить"
+          cancelText="Отмена"
+          type="danger"
+          onConfirm={handleDeleteResume}
+          onCancel={() => {
+            setShowDeleteResumeDialog(false);
+            setResumeToDelete(null);
+          }}
+        />
       </div>
     </Layout>
   );

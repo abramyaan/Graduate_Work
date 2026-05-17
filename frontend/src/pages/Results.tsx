@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useToast } from '../context/ToastContext';
 import { evaluationsApi } from '../api/evaluations';
 import { vacanciesApi } from '../api/vacancies';
 import { EvaluationResult, Vacancy } from '../types';
@@ -9,6 +10,7 @@ import { EvaluationResult, Vacancy } from '../types';
 const Results: React.FC = () => {
   const { vacancyId } = useParams<{ vacancyId: string }>();
   const navigate = useNavigate();
+  const { showSuccess, showError: showToastError, showWarning } = useToast();
   const [results, setResults] = useState<EvaluationResult[]>([]);
   const [filteredResults, setFilteredResults] = useState<EvaluationResult[]>([]);
   const [vacancy, setVacancy] = useState<Vacancy | null>(null);
@@ -108,6 +110,39 @@ const Results: React.FC = () => {
 
   const handleViewDetails = (evaluationId: number) => {
     navigate(`/candidate/${evaluationId}`);
+  };
+
+  const handleInvite = (candidateName: string) => {
+    showSuccess(`✓ Приглашение отправлено кандидату: ${candidateName}`);
+  };
+
+  const handlePostpone = (candidateName: string) => {
+    showWarning(`⏸ Кандидат отложен на рассмотрение: ${candidateName}`);
+  };
+
+  const handleReject = async (resultId: number, candidateName: string) => {
+    if (!window.confirm(`Вы уверены, что хотите отклонить кандидата ${candidateName}? Результат будет удален.`)) {
+      return;
+    }
+
+    try {
+      // Удаляем результат из БД через API
+      await fetch(`http://localhost:8000/api/results/${resultId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+      });
+
+      // Удаляем из локального состояния
+      const updatedResults = results.filter(r => r.result_id !== resultId);
+      setResults(updatedResults);
+      setFilteredResults(filteredResults.filter(r => r.result_id !== resultId));
+
+      showToastError(`✕ Кандидат ${candidateName} отклонен и удален из результатов`);
+    } catch (err: any) {
+      showToastError('Ошибка удаления: ' + (err.message || 'Неизвестная ошибка'));
+    }
   };
 
   if (loading) {
@@ -245,45 +280,64 @@ const Results: React.FC = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredResults.map((result) => (
-                    <tr
-                      key={result.result_id}
-                      className={`${getScoreColor(Number(result.overall_score))} transition-colors cursor-pointer`}
-                      onClick={() => handleViewDetails(result.result_id)}
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {result.candidate_name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-lg font-bold text-gray-900">
-                          {Number(result.overall_score).toFixed(2)}%
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRecommendationBadge(
-                            result.recommendation_text
-                          )}`}
+                        <tr
+                          key={result.result_id}
+                          className={`${getScoreColor(Number(result.overall_score))} transition-colors`}
                         >
-                          {result.recommendation_text}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(result.analysis_date).toLocaleDateString('ru-RU')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewDetails(result.result_id);
-                          }}
-                          className="text-blue-600 hover:text-blue-900 font-medium"
-                        >
-                          Подробнее
-                        </button>
-                      </td>
-                    </tr>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {result.candidate_name}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-lg font-bold text-gray-900">
+                              {Number(result.overall_score).toFixed(2)}%
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRecommendationBadge(
+                                result.recommendation_text
+                              )}`}
+                            >
+                              {result.recommendation_text}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(result.analysis_date).toLocaleDateString('ru-RU')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="flex flex-col space-y-1.5">
+                              <button
+                                onClick={() => handleViewDetails(result.result_id)}
+                                className="text-blue-600 hover:text-blue-900 font-medium text-left"
+                              >
+                                📄 Подробнее
+                              </button>
+                              <button
+                                onClick={() => handleInvite(result.candidate_name)}
+                                className="text-green-600 hover:text-green-900 font-medium text-left"
+                                title="Пригласить кандидата"
+                              >
+                                ✓ Пригласить
+                              </button>
+                              <button
+                                onClick={() => handlePostpone(result.candidate_name)}
+                                className="text-yellow-600 hover:text-yellow-900 font-medium text-left"
+                                title="Отложить кандидата"
+                              >
+                                ⏸ Отложить
+                              </button>
+                              <button
+                                onClick={() => handleReject(result.result_id, result.candidate_name)}
+                                className="text-red-600 hover:text-red-900 font-medium text-left"
+                                title="Отклонить и удалить"
+                              >
+                                ✕ Отклонить
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>

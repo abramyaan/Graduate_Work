@@ -8,13 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from backend.db.database import get_db
-from backend.models.models import Candidate, Resume
+from backend.models.models import (
+    Candidate,
+    Resume,
+    ResumeVacancy,
+    ResumeSkill,
+    ResultEvaluation,
+    ResultCategoryScore,
+)
 from backend.schemas.candidate import (
     CandidateCreate,
     CandidateUpdate,
     CandidateResponse,
     CandidateWithResumes,
 )
+import os
 
 router = APIRouter()
 
@@ -144,7 +152,7 @@ async def delete_candidate(
     candidate_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Удалить кандидата"""
+    """Удалить кандидата вместе со всеми его резюме и связанными данными"""
     candidate = await db.get(Candidate, candidate_id)
     if not candidate:
         raise HTTPException(
@@ -152,19 +160,67 @@ async def delete_candidate(
             detail=f"Кандидат с ID {candidate_id} не найден"
         )
 
-    # Проверка на наличие резюме
+    # Получаем все резюме кандидата
     result = await db.execute(
-        select(func.count(Resume.resume_id)).where(Resume.candidate_id == candidate_id)
+        select(Resume).where(Resume.candidate_id == candidate_id)
     )
-    resume_count = result.scalar()
+    resumes = result.scalars().all()
 
-    if resume_count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Невозможно удалить кандидата: у него есть {resume_count} резюме"
+    # Для каждого резюме удаляем все зависимости
+    for resume in resumes:
+        resume_id = resume.resume_id
+
+        # 1. Удаляем все result_category_score для result_evaluation этого резюме
+        result_evals = await db.execute(
+            select(ResultEvaluation).where(ResultEvaluation.resume_id == resume_id)
         )
+        evaluations = result_evals.scalars().all()
 
-    db.delete(candidate)
+        for evaluation in evaluations:
+            # Удаляем category scores
+            await db.execute(
+                select(ResultCategoryScore)
+                .where(ResultCategoryScore.result_id == evaluation.result_id)
+            )
+            category_scores = (await db.execute(
+                select(ResultCategoryScore)
+                .where(ResultCategoryScore.result_id == evaluation.result_id)
+            )).scalars().all()
+
+            for score in category_scores:
+                await db.delete(score)
+
+            # Удаляем оценку
+            await db.delete(evaluation)
+
+        # 2. Удаляем записи из resume_vacancy
+        resume_vacancies = (await db.execute(
+            select(ResumeVacancy).where(ResumeVacancy.resume_id == resume_id)
+        )).scalars().all()
+
+        for rv in resume_vacancies:
+            await db.delete(rv)
+
+        # 3. Удаляем записи из resume_skill
+        resume_skills = (await db.execute(
+            select(ResumeSkill).where(ResumeSkill.resume_id == resume_id)
+        )).scalars().all()
+
+        for rs in resume_skills:
+            await db.delete(rs)
+
+        # 4. Удаляем физический файл резюме
+        if os.path.exists(resume.file_path):
+            try:
+                os.remove(resume.file_path)
+            except Exception as e:
+                print(f"Ошибка при удалении файла {resume.file_path}: {e}")
+
+        # 5. Удаляем само резюме
+        await db.delete(resume)
+
+    # Наконец удаляем кандидата
+    await db.delete(candidate)
     await db.commit()
 
     return None

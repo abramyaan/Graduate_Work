@@ -9,7 +9,8 @@
 """
 
 import os
-from typing import Dict, List, Optional
+import re
+from typing import Dict, List, Optional, Set
 from decimal import Decimal
 
 import torch
@@ -30,6 +31,79 @@ CATEGORY_WEIGHTS = {
     "Структура": 0.20,
     "ATS-совместимость": 0.10,
 }
+
+# Технические термины для ATS (не склоняются, используются в оригинальном виде)
+TECH_TERMS = {
+    # Языки программирования
+    'python', 'java', 'javascript', 'typescript', 'go', 'golang', 'php', 'ruby',
+    'c++', 'c#', 'swift', 'kotlin', 'rust', 'scala', 'perl', 'r', 'matlab',
+
+    # Фреймворки и библиотеки
+    'django', 'flask', 'fastapi', 'react', 'vue', 'angular', 'node', 'nodejs',
+    'express', 'spring', 'laravel', 'rails', 'asp.net', 'net', '.net',
+
+    # Базы данных
+    'postgresql', 'postgres', 'mysql', 'mongodb', 'redis', 'cassandra',
+    'elasticsearch', 'clickhouse', 'oracle', 'mssql', 'sqlite', 'dynamodb',
+
+    # DevOps и инфраструктура
+    'docker', 'kubernetes', 'k8s', 'jenkins', 'gitlab', 'github', 'git',
+    'aws', 'azure', 'gcp', 'terraform', 'ansible', 'prometheus', 'grafana',
+    'nginx', 'apache', 'linux', 'ubuntu', 'centos', 'debian',
+
+    # Очереди и стримы
+    'kafka', 'rabbitmq', 'celery', 'airflow',
+
+    # Тестирование
+    'pytest', 'unittest', 'jest', 'selenium', 'cypress',
+
+    # Другие технологии
+    'rest', 'api', 'graphql', 'grpc', 'microservices', 'ci/cd', 'agile', 'scrum',
+    'sql', 'nosql', 'orm', 'sqlalchemy', 'pandas', 'numpy', 'tensorflow', 'pytorch',
+}
+
+
+# =============================================================================
+# Вспомогательные функции для анализа текста
+# =============================================================================
+
+def calculate_ats_score(resume_text: str, vacancy_text: str) -> float:
+    """
+    Рассчитать ATS-совместимость на основе технических терминов
+
+    ATS (Applicant Tracking System) проверяет наличие ключевых
+    технических терминов из вакансии в резюме.
+
+    Логика:
+    1. Найти какие технические термины упоминаются в вакансии
+    2. Проверить какие из них есть в резюме
+    3. Процент совпадения = (термины в резюме / термины в вакансии) * 100
+
+    Args:
+        resume_text: текст резюме
+        vacancy_text: текст вакансии
+
+    Returns:
+        ats_score: процент совпадения технических терминов (0-100)
+    """
+    # Приведение к нижнему регистру
+    resume_lower = resume_text.lower()
+    vacancy_lower = vacancy_text.lower()
+
+    # Найти какие термины требуются в вакансии
+    required_terms = {term for term in TECH_TERMS if term in vacancy_lower}
+
+    if not required_terms:
+        # Если в вакансии нет технических терминов, ставим средний балл
+        return 75.0
+
+    # Найти какие из требуемых терминов есть в резюме
+    matched_terms = {term for term in required_terms if term in resume_lower}
+
+    # Процент совпадения
+    ats_score = (len(matched_terms) / len(required_terms)) * 100
+
+    return ats_score
 
 
 # =============================================================================
@@ -97,9 +171,11 @@ class ResumeEvaluator:
         """
         Оценка резюме по категориям
 
-        В реальной системе здесь должна быть более сложная логика,
-        анализирующая конкретные аспекты (навыки, опыт, структуру).
-        Пока используем упрощённую версию на основе общего сходства.
+        Категории:
+        1. Навыки (40%) - косинусное сходство
+        2. Опыт (30%) - косинусное сходство с небольшим штрафом
+        3. Структура (20%) - косинусное сходство с умеренным штрафом
+        4. ATS-совместимость (10%) - процент совпадения технических терминов
 
         Args:
             resume_text: текст резюме
@@ -108,16 +184,36 @@ class ResumeEvaluator:
         Returns:
             scores: словарь {категория: балл 0-100}
         """
-        # Базовое сходство
-        base_similarity = self.compute_similarity(resume_text, vacancy_text)
+        # 1. Базовое косинусное сходство (для большинства категорий)
+        cosine_similarity = self.compute_similarity(resume_text, vacancy_text)
+        cosine_score = cosine_similarity * 100
 
-        # Упрощённая эмуляция оценок по категориям
-        # TODO: заменить на реальный анализ по категориям
+        # 2. ATS-совместимость на основе технических терминов
+        ats_score = calculate_ats_score(resume_text, vacancy_text)
+
+        # 3. Формирование оценок по категориям
+
+        # Категория "Навыки" (40%):
+        # Косинусное сходство (семантическая близость навыков)
+        skills_score = cosine_score
+
+        # Категория "Опыт" (30%):
+        # Косинусное сходство с небольшим штрафом
+        experience_score = cosine_score * 0.95
+
+        # Категория "Структура" (20%):
+        # Косинусное сходство с умеренным штрафом
+        structure_score = cosine_score * 0.90
+
+        # Категория "ATS-совместимость" (10%):
+        # Процент совпадения технических терминов из вакансии
+        # (важно для прохождения автоматических систем отбора)
+
         scores = {
-            "Навыки": base_similarity * 100,
-            "Опыт": base_similarity * 95,  # Немного ниже
-            "Структура": base_similarity * 90,
-            "ATS-совместимость": base_similarity * 85,
+            "Навыки": skills_score,
+            "Опыт": experience_score,
+            "Структура": structure_score,
+            "ATS-совместимость": ats_score,
         }
 
         return scores

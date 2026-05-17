@@ -57,4 +57,15 @@ export const resumesApi = {
     );
     return response.data;
   },
+
+  getByCandidate: async (candidateId: number): Promise<Resume[]> => {
+    const response = await apiClient.get<Resume[]>(
+      `/resumes/?candidate_id=${candidateId}`
+    );
+    return response.data;
+  },
+
+  delete: async (resumeId: number): Promise<void> => {
+    await apiClient.delete(`/resumes/${resumeId}`);
+  },
 };
