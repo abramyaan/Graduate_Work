@@ -52,6 +52,7 @@ export interface Candidate {
   patronymic?: string | null;
   email?: string | null;
   phone?: string | null;
+  full_name?: string;
 }
 
 export interface CandidateCreate {
@@ -63,19 +64,12 @@ export interface CandidateCreate {
 }
 
 export interface EvaluationResult {
-  id: number;
-  candidate_id: number;
-  candidate: Candidate;
-  vacancy_id: number;
-  vacancy: Vacancy;
-  overall_score: number;
-  skills_score: number;
-  experience_score: number;
-  structure_score: number;
-  ats_score: number;
-  recommendation: string;
-  evaluated_at: string;
-  evaluated_by_user_id: number;
+  result_id: number;
+  overall_score: number | string;  // Приходит как строка из-за Decimal в Python
+  analysis_date: string;
+  candidate_name: string;
+  vacancy_title: string | null;
+  recommendation_text: string;
 }
 
 export interface CategoryScore {

@@ -21,4 +21,13 @@ export const vacanciesApi = {
     const response = await apiClient.post<Vacancy>('/vacancies', data);
     return response.data;
   },
+
+  update: async (id: number, data: Partial<VacancyCreate>): Promise<Vacancy> => {
+    const response = await apiClient.put<Vacancy>(`/vacancies/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await apiClient.delete(`/vacancies/${id}`);
+  },
 };

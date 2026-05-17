@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(venv/Scripts/python.exe --version)",
-      "Bash(dir /s /b)"
+      "Bash(dir /s /b)",
+      "Bash(c:\\\\Users\\\\Ero\\\\Graduate_Work\\\\venv\\\\Scripts\\\\activate.bat *)",
+      "Bash(C:\\\\Users\\\\Ero\\\\Graduate_Work\\\\venv\\\\Scripts\\\\Activate.ps1 *)"
     ]
   }
 }

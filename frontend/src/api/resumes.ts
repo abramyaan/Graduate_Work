@@ -7,6 +7,18 @@ export interface ResumeUploadResponse {
   message: string;
 }
 
+export interface Resume {
+  resume_id: number;
+  file_path: string;
+  file_format: string;
+  extracted_text: string | null;
+  upload_date: string;
+  candidate_id: number;
+  candidate_last_name: string;
+  candidate_first_name: string;
+  candidate_patronymic: string | null;
+}
+
 export const resumesApi = {
   upload: async (file: File, candidateId: number, vacancyId: number): Promise<ResumeUploadResponse> => {
     // FormData для multipart/form-data запроса
@@ -35,6 +47,13 @@ export const resumesApi = {
           // Явно НЕ указываем Content-Type - пусть Axios сам установит правильный
         }
       }
+    );
+    return response.data;
+  },
+
+  getByVacancy: async (vacancyId: number): Promise<Resume[]> => {
+    const response = await apiClient.get<Resume[]>(
+      `/resumes/?vacancy_id=${vacancyId}`
     );
     return response.data;
   },

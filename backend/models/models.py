@@ -201,7 +201,6 @@ class Resume(Base):
 
     __table_args__ = (
         CheckConstraint("file_format IN ('pdf', 'docx')", name="check_file_format"),
-        CheckConstraint("upload_date <= CURRENT_DATE", name="check_upload_date"),
         CheckConstraint("LENGTH(file_path) > 0", name="check_file_path"),
     )
 
@@ -223,10 +222,6 @@ class ResumeVacancy(Base):
     # Связи
     resume: Mapped["Resume"] = relationship("Resume", back_populates="vacancy_applications")
     vacancy: Mapped["Vacancy"] = relationship("Vacancy", back_populates="resume_applications")
-
-    __table_args__ = (
-        CheckConstraint("applied_at <= CURRENT_DATE", name="check_applied_date"),
-    )
 
 
 # =============================================================================
@@ -366,7 +361,6 @@ class ResultEvaluation(Base):
 
     __table_args__ = (
         CheckConstraint("overall_score >= 0 AND overall_score <= 100", name="check_overall_score"),
-        CheckConstraint("analysis_date <= CURRENT_TIMESTAMP", name="check_analysis_date"),
     )
 
 

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { useToast } from '../context/ToastContext';
 import { vacanciesApi } from '../api/vacancies';
 import { specializationsApi } from '../api/specializations';
 import { Specialization } from '../types';
 
 const CreateVacancy: React.FC = () => {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useToast();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [specializationId, setSpecializationId] = useState<number | ''>('');
@@ -32,7 +34,17 @@ const CreateVacancy: React.FC = () => {
     setError('');
 
     if (!title.trim() || !description.trim() || !specializationId) {
-      setError('Заполните все обязательные поля');
+      showError('Заполните все обязательные поля');
+      return;
+    }
+
+    if (title.trim().length < 5) {
+      showError('Название должно содержать минимум 5 символов');
+      return;
+    }
+
+    if (description.trim().length < 20) {
+      showError('Описание должно содержать минимум 20 символов');
       return;
     }
 
@@ -44,9 +56,10 @@ const CreateVacancy: React.FC = () => {
         specialization_id: Number(specializationId),
         is_active: true,
       });
+      showSuccess('Вакансия успешно создана!');
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка создания вакансии');
+      showError(err.response?.data?.detail || 'Ошибка создания вакансии');
     } finally {
       setLoading(false);
     }

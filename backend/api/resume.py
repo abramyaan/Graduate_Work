@@ -3,11 +3,14 @@
 """
 from typing import List
 import traceback
+import PyPDF2
+from docx import Document
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 import os
 from datetime import datetime
 
@@ -81,12 +84,31 @@ async def upload_resume(
             content = await file.read()
             f.write(content)
 
+        # Парсинг текста из файла
+        extracted_text = None
+        try:
+            if file_extension == "pdf":
+                # Парсинг PDF с помощью PyPDF2
+                with open(file_path, "rb") as pdf_file:
+                    reader = PyPDF2.PdfReader(pdf_file)
+                    extracted_text = " ".join(
+                        page.extract_text() for page in reader.pages if page.extract_text()
+                    )
+            elif file_extension == "docx":
+                # Парсинг DOCX с помощью python-docx
+                doc = Document(file_path)
+                extracted_text = " ".join(para.text for para in doc.paragraphs if para.text)
+        except Exception as parse_error:
+            # Логируем ошибку парсинга, но не прерываем загрузку файла
+            print(f"⚠️  Ошибка парсинга файла {file_path}: {parse_error}")
+            extracted_text = None
+
         # Создание записи Resume в БД
         resume = Resume(
             file_path=file_path,
             file_format=file_extension,
             candidate_id=candidate_id,
-            extracted_text=None  # TODO: добавить парсинг PDF/DOCX
+            extracted_text=extracted_text
         )
         db.add(resume)
         await db.commit()
@@ -162,26 +184,39 @@ async def get_resumes(
     skip: int = 0,
     limit: int = 100,
     candidate_id: int = None,
+    vacancy_id: int = None,
     db: AsyncSession = Depends(get_db)
 ):
-    """Получить список всех резюме"""
-    query = select(Resume).join(Candidate)
+    """Получить список всех резюме с фильтрацией по candidate_id или vacancy_id"""
+    query = select(Resume).options(selectinload(Resume.candidate)).join(Candidate)
 
     if candidate_id is not None:
         query = query.where(Resume.candidate_id == candidate_id)
+
+    if vacancy_id is not None:
+        # Фильтрация по vacancy_id через ResumeVacancy
+        query = query.join(ResumeVacancy).where(ResumeVacancy.vacancy_id == vacancy_id)
 
     query = query.offset(skip).limit(limit)
     result_query = await db.execute(query)
     resumes = result_query.scalars().all()
 
-    # Добавление данных кандидата
+    # Формирование ответа с данными кандидата из уже загруженного relationship
     result = []
     for resume in resumes:
-        resume_dict = ResumeWithCandidate.model_validate(resume).model_dump()
-        resume_dict["candidate_last_name"] = resume.candidate.last_name
-        resume_dict["candidate_first_name"] = resume.candidate.first_name
-        resume_dict["candidate_patronymic"] = resume.candidate.patronymic
-        result.append(ResumeWithCandidate(**resume_dict))
+        result.append(
+            ResumeWithCandidate(
+                resume_id=resume.resume_id,
+                file_path=resume.file_path,
+                file_format=resume.file_format,
+                extracted_text=resume.extracted_text,
+                upload_date=resume.upload_date,
+                candidate_id=resume.candidate_id,
+                candidate_last_name=resume.candidate.last_name,
+                candidate_first_name=resume.candidate.first_name,
+                candidate_patronymic=resume.candidate.patronymic,
+            )
+        )
 
     return result
 
@@ -192,19 +227,27 @@ async def get_resume(
     db: AsyncSession = Depends(get_db)
 ):
     """Получить резюме по ID"""
-    resume = await db.get(Resume, resume_id)
+    query = select(Resume).options(selectinload(Resume.candidate)).where(Resume.resume_id == resume_id)
+    result = await db.execute(query)
+    resume = result.scalar_one_or_none()
+
     if not resume:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Резюме с ID {resume_id} не найдено"
         )
 
-    resume_dict = ResumeWithCandidate.model_validate(resume).model_dump()
-    resume_dict["candidate_last_name"] = resume.candidate.last_name
-    resume_dict["candidate_first_name"] = resume.candidate.first_name
-    resume_dict["candidate_patronymic"] = resume.candidate.patronymic
-
-    return ResumeWithCandidate(**resume_dict)
+    return ResumeWithCandidate(
+        resume_id=resume.resume_id,
+        file_path=resume.file_path,
+        file_format=resume.file_format,
+        extracted_text=resume.extracted_text,
+        upload_date=resume.upload_date,
+        candidate_id=resume.candidate_id,
+        candidate_last_name=resume.candidate.last_name,
+        candidate_first_name=resume.candidate.first_name,
+        candidate_patronymic=resume.candidate.patronymic,
+    )
 
 
 @router.put("/{resume_id}", response_model=ResumeResponse)

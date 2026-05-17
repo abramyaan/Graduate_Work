@@ -180,7 +180,6 @@ CREATE TABLE IF NOT EXISTS public.resume (
     upload_date    DATE         NOT NULL DEFAULT CURRENT_DATE,
     candidate_id   INTEGER      NOT NULL REFERENCES candidate(candidate_id),
     CONSTRAINT check_file_format CHECK (file_format IN ('pdf', 'docx')),
-    CONSTRAINT check_upload_date CHECK (upload_date <= CURRENT_DATE),
     CONSTRAINT check_file_path   CHECK (LENGTH(file_path) > 0)
 );
 
@@ -200,8 +199,7 @@ CREATE TABLE IF NOT EXISTS public.resume_vacancy (
     resume_id  INTEGER NOT NULL REFERENCES resume(resume_id),
     vacancy_id INTEGER NOT NULL REFERENCES vacancy(vacancy_id),
     applied_at DATE    NOT NULL DEFAULT CURRENT_DATE,
-    PRIMARY KEY (resume_id, vacancy_id),
-    CONSTRAINT check_applied_date CHECK (applied_at <= CURRENT_DATE)
+    PRIMARY KEY (resume_id, vacancy_id)
 );
 
 COMMENT ON TABLE  public.resume_vacancy IS 'Факт подачи резюме на конкретную вакансию';
@@ -322,8 +320,7 @@ CREATE TABLE IF NOT EXISTS public.result_evaluation (
     model_id          INTEGER      NOT NULL REFERENCES model(model_id),
     user_id           INTEGER      NOT NULL REFERENCES user_account(user_id),
     recommendation_id INTEGER      NOT NULL REFERENCES recommendation_rule(recommendation_id),
-    CONSTRAINT check_overall_score CHECK (overall_score >= 0 AND overall_score <= 100),
-    CONSTRAINT check_analysis_date CHECK (analysis_date <= CURRENT_TIMESTAMP)
+    CONSTRAINT check_overall_score CHECK (overall_score >= 0 AND overall_score <= 100)
 );
 
 COMMENT ON TABLE  public.result_evaluation IS 'Результаты оценки резюме на соответствие вакансии';

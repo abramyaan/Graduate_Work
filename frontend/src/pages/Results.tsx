@@ -10,16 +10,23 @@ const Results: React.FC = () => {
   const { vacancyId } = useParams<{ vacancyId: string }>();
   const navigate = useNavigate();
   const [results, setResults] = useState<EvaluationResult[]>([]);
+  const [filteredResults, setFilteredResults] = useState<EvaluationResult[]>([]);
   const [vacancy, setVacancy] = useState<Vacancy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [scoreFilter, setScoreFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
 
   useEffect(() => {
     if (vacancyId) {
       loadData(parseInt(vacancyId));
     }
   }, [vacancyId]);
+
+  useEffect(() => {
+    filterResults();
+  }, [searchQuery, scoreFilter, results]);
 
   const loadData = async (id: number) => {
     try {
@@ -28,12 +35,38 @@ const Results: React.FC = () => {
         vacanciesApi.getById(id),
       ]);
       setResults(resultsData);
+      setFilteredResults(resultsData);
       setVacancy(vacancyData);
     } catch (err: any) {
       setError('Ошибка загрузки данных: ' + (err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterResults = () => {
+    let filtered = [...results];
+
+    // Фильтр по поиску
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((result) =>
+        result.candidate_name.toLowerCase().includes(query)
+      );
+    }
+
+    // Фильтр по баллу
+    if (scoreFilter !== 'all') {
+      filtered = filtered.filter((result) => {
+        const score = Number(result.overall_score);
+        if (scoreFilter === 'high') return score >= 75;
+        if (scoreFilter === 'medium') return score >= 50 && score < 75;
+        if (scoreFilter === 'low') return score < 50;
+        return true;
+      });
+    }
+
+    setFilteredResults(filtered);
   };
 
   const getScoreColor = (score: number): string => {
@@ -129,88 +162,121 @@ const Results: React.FC = () => {
           </div>
         )}
 
+        {/* Поиск и фильтрация */}
+        {results.length > 0 && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Поиск */}
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по имени кандидата..."
+                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <svg
+                className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+
+            {/* Фильтр по баллу */}
+            <div>
+              <select
+                value={scoreFilter}
+                onChange={(e) => setScoreFilter(e.target.value as any)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Все результаты</option>
+                <option value="high">Высокий балл (≥75)</option>
+                <option value="medium">Средний балл (50-74)</option>
+                <option value="low">Низкий балл (&lt;50)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         {results.length === 0 ? (
           <div className="bg-white shadow-md rounded-lg px-6 py-8 text-center text-gray-500">
             Нет результатов оценки для данной вакансии
           </div>
         ) : (
           <div className="bg-white shadow-md rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ФИО
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Общий балл
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Навыки
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Опыт
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Структура
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ATS
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Рекомендация
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Действия
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {results.map((result) => (
+            {filteredResults.length === 0 ? (
+              <div className="px-6 py-8 text-center text-gray-500">
+                Ничего не найдено. Попробуйте изменить параметры поиска.
+              </div>
+            ) : (
+              <>
+                <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    Показано: {filteredResults.length} из {results.length}
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ФИО кандидата
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Общий балл
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Рекомендация
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Дата оценки
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Действия
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredResults.map((result) => (
                     <tr
-                      key={result.id}
-                      className={`${getScoreColor(result.overall_score)} transition-colors cursor-pointer`}
-                      onClick={() => handleViewDetails(result.id)}
+                      key={result.result_id}
+                      className={`${getScoreColor(Number(result.overall_score))} transition-colors cursor-pointer`}
+                      onClick={() => handleViewDetails(result.result_id)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {result.candidate.full_name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {result.candidate.email}
+                          {result.candidate_name}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-lg font-bold text-gray-900">
-                          {result.overall_score.toFixed(2)}
+                          {Number(result.overall_score).toFixed(2)}%
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.skills_score.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.experience_score.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.structure_score.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {result.ats_score.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getRecommendationBadge(
-                            result.recommendation
+                          className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getRecommendationBadge(
+                            result.recommendation_text
                           )}`}
                         >
-                          {result.recommendation}
+                          {result.recommendation_text}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(result.analysis_date).toLocaleDateString('ru-RU')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleViewDetails(result.id);
+                            handleViewDetails(result.result_id);
                           }}
                           className="text-blue-600 hover:text-blue-900 font-medium"
                         >
@@ -218,10 +284,12 @@ const Results: React.FC = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

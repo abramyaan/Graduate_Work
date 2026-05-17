@@ -66,15 +66,51 @@ class ResultEvaluationResponse(ResultEvaluationBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ResultEvaluationDetailed(ResultEvaluationResponse):
+class CandidateInfo(BaseModel):
+    """Информация о кандидате"""
+    candidate_id: int
+    last_name: str
+    first_name: str
+    patronymic: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    full_name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VacancyInfo(BaseModel):
+    """Информация о вакансии"""
+    vacancy_id: int
+    title: str
+    description: Optional[str] = None
+    specialization_id: Optional[int] = None
+    is_active: bool = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CategoryScoreDetailed(BaseModel):
+    """Детальная оценка по категории"""
+    category_name: str
+    score: Decimal = Field(..., ge=0, le=100)
+    weight: Decimal = Field(..., ge=0, le=1)
+    weighted_score: Decimal = Field(..., ge=0, le=100)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ResultEvaluationDetailed(BaseModel):
     """Детальная схема результата оценки с доп. данными"""
-    candidate_last_name: Optional[str] = None
-    candidate_first_name: Optional[str] = None
-    vacancy_title: Optional[str] = None
-    recommendation_text: Optional[str] = None
-    category_scores: List[ResultCategoryScoreResponse] = []
-    user_login: Optional[str] = None
-    model_name: Optional[str] = None
+    id: int
+    candidate: CandidateInfo
+    vacancy: VacancyInfo
+    overall_score: Decimal = Field(..., ge=0, le=100)
+    category_scores: List[CategoryScoreDetailed] = []
+    recommendation: str
+    evaluated_at: datetime
+    evaluator_name: str
+    resume_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

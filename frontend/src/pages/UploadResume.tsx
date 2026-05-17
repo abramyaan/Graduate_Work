@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { useToast } from '../context/ToastContext';
 import { candidatesApi } from '../api/candidates';
 import { resumesApi } from '../api/resumes';
 import { vacanciesApi } from '../api/vacancies';
@@ -8,6 +9,7 @@ import { Vacancy } from '../types';
 
 const UploadResume: React.FC = () => {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useToast();
   const { vacancyId } = useParams<{ vacancyId?: string }>();
 
   const [lastName, setLastName] = useState('');
@@ -85,10 +87,14 @@ const UploadResume: React.FC = () => {
       await resumesApi.upload(file, candidate.candidate_id, Number(selectedVacancyId));
 
       // Перенаправляем на дашборд
-      alert('Резюме успешно загружено!');
+      showSuccess('Резюме успешно загружено!');
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.detail || JSON.stringify(err.response?.data) || 'Ошибка загрузки резюме');
+      setError(
+        typeof err.response?.data === 'string'
+          ? err.response.data
+          : err.response?.data?.detail || err.response?.data?.error || 'Ошибка загрузки резюме'
+      );
     } finally {
       setLoading(false);
     }

@@ -36,7 +36,18 @@ const CandidateDetail: React.FC = () => {
   const loadEvaluation = async (id: number) => {
     try {
       const data = await evaluationsApi.getById(id);
-      setEvaluation(data);
+      // Преобразуем overall_score из строки в число
+      const normalizedData = {
+        ...data,
+        overall_score: Number(data.overall_score),
+        category_scores: data.category_scores.map(cs => ({
+          ...cs,
+          score: Number(cs.score),
+          weight: Number(cs.weight),
+          weighted_score: Number(cs.weighted_score),
+        })),
+      };
+      setEvaluation(normalizedData);
     } catch (err: any) {
       setError('Ошибка загрузки данных: ' + (err.response?.data?.detail || err.message));
     } finally {
