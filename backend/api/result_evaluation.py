@@ -417,7 +417,8 @@ async def get_evaluations(
 @router.get("/{result_id}", response_model=ResultEvaluationDetailed)
 async def get_evaluation(
     result_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    evaluator = Depends(get_evaluator)
 ):
     """Получить детальный результат оценки по ID"""
     # Загрузка результата с eager loading всех relationships
@@ -486,6 +487,24 @@ async def get_evaluation(
             )
         )
 
+    # Формирование анализа соответствия
+    matching_analysis = None
+    if (vacancy and vacancy.description and
+        result.resume.extracted_text):
+        # Запуск анализа в отдельном потоке
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            analysis_result = await loop.run_in_executor(
+                executor,
+                lambda: evaluator.analyze_matching(
+                    resume_text=result.resume.extracted_text,
+                    vacancy_text=vacancy.description
+                )
+            )
+
+        from backend.schemas.result_evaluation import MatchingAnalysis
+        matching_analysis = MatchingAnalysis(**analysis_result)
+
     # Формирование детального ответа
     detailed_response = ResultEvaluationDetailed(
         id=result.result_id,
@@ -504,7 +523,8 @@ async def get_evaluation(
         recommendation=result.recommendation.recommendation_text,
         evaluated_at=result.analysis_date,
         evaluator_name=result.user.login,
-        resume_url=result.resume.file_path if result.resume.file_path else None
+        resume_url=result.resume.file_path if result.resume.file_path else None,
+        matching_analysis=matching_analysis
     )
 
     return detailed_response

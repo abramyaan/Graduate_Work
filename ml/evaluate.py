@@ -302,6 +302,86 @@ class ResumeEvaluator:
 
         return results
 
+    def analyze_matching(
+        self,
+        resume_text: str,
+        vacancy_text: str
+    ) -> Dict:
+        """
+        Детальный анализ соответствия резюме и вакансии
+
+        Args:
+            resume_text: текст резюме
+            vacancy_text: текст вакансии
+
+        Returns:
+            analysis: словарь с детальным анализом
+            {
+                "matched_skills": [...],      # навыки которые есть в обоих
+                "missing_skills": [...],      # навыки из вакансии которых нет в резюме
+                "resume_highlights": [...],   # топ предложения из резюме
+                "summary": "..."              # итоговый вывод
+            }
+        """
+        # Приведение к нижнему регистру
+        resume_lower = resume_text.lower()
+        vacancy_lower = vacancy_text.lower()
+
+        # 1. Анализ технических навыков
+        # Найти какие термины требуются в вакансии
+        required_skills = sorted([term for term in TECH_TERMS if term in vacancy_lower])
+
+        # Найти какие из требуемых терминов есть в резюме
+        matched_skills = sorted([term for term in required_skills if term in resume_lower])
+
+        # Навыки которых не хватает
+        missing_skills = sorted([term for term in required_skills if term not in resume_lower])
+
+        # 2. Поиск релевантных фрагментов резюме
+        # Разбиваем резюме на предложения
+        sentences = re.split(r'[.!?]\s+', resume_text)
+        sentences = [s.strip() for s in sentences if len(s.strip()) > 20]  # минимум 20 символов
+
+        if sentences:
+            # Вычисляем сходство каждого предложения с вакансией
+            sentence_scores = []
+            for sent in sentences:
+                similarity = self.compute_similarity(sent, vacancy_text)
+                sentence_scores.append((sent, similarity))
+
+            # Сортируем по убыванию сходства и берём топ-3
+            sentence_scores.sort(key=lambda x: x[1], reverse=True)
+            resume_highlights = [sent for sent, score in sentence_scores[:3]]
+        else:
+            resume_highlights = []
+
+        # 3. Формирование итогового вывода
+        total_required = len(required_skills)
+        total_matched = len(matched_skills)
+
+        if total_required > 0:
+            match_percentage = (total_matched / total_required) * 100
+            summary = f"Кандидат владеет {total_matched} из {total_required} требуемых навыков ({match_percentage:.0f}%)."
+        else:
+            summary = "В вакансии не указаны конкретные технические требования."
+
+        # Добавляем сильные стороны
+        if matched_skills:
+            top_skills = matched_skills[:5]  # топ-5
+            summary += f" Сильные стороны: {', '.join(top_skills)}."
+
+        # Добавляем отсутствующие навыки
+        if missing_skills:
+            top_missing = missing_skills[:3]  # топ-3 отсутствующих
+            summary += f" Отсутствует: {', '.join(top_missing)}."
+
+        return {
+            "matched_skills": matched_skills,
+            "missing_skills": missing_skills,
+            "resume_highlights": resume_highlights,
+            "summary": summary
+        }
+
 
 # =============================================================================
 # Вспомогательные функции

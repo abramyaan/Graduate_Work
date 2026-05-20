@@ -100,6 +100,28 @@ class CategoryScoreDetailed(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MatchingAnalysis(BaseModel):
+    """Анализ соответствия резюме и вакансии"""
+    matched_skills: List[str] = Field(
+        default_factory=list,
+        description="Навыки которые есть и в резюме и в вакансии"
+    )
+    missing_skills: List[str] = Field(
+        default_factory=list,
+        description="Навыки из вакансии которых нет в резюме"
+    )
+    resume_highlights: List[str] = Field(
+        default_factory=list,
+        description="Топ релевантных фрагментов из резюме"
+    )
+    summary: str = Field(
+        default="",
+        description="Итоговый вывод по соответствию"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ResultEvaluationDetailed(BaseModel):
     """Детальная схема результата оценки с доп. данными"""
     id: int
@@ -111,6 +133,7 @@ class ResultEvaluationDetailed(BaseModel):
     evaluated_at: datetime
     evaluator_name: str
     resume_url: Optional[str] = None
+    matching_analysis: Optional[MatchingAnalysis] = None
 
     model_config = ConfigDict(from_attributes=True)
 

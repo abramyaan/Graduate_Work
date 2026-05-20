@@ -79,6 +79,13 @@ export interface CategoryScore {
   weighted_score: number;
 }
 
+export interface MatchingAnalysis {
+  matched_skills: string[];
+  missing_skills: string[];
+  resume_highlights: string[];
+  summary: string;
+}
+
 export interface DetailedEvaluation {
   id: number;
   candidate: Candidate;
@@ -89,6 +96,7 @@ export interface DetailedEvaluation {
   evaluated_at: string;
   evaluator_name: string;
   resume_url?: string;
+  matching_analysis?: MatchingAnalysis;
 }
 
 export interface DashboardStats {
